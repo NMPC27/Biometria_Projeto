@@ -2,6 +2,8 @@ import customtkinter as Ctk
 import cv2
 import face_detection
 from PIL import Image, ImageTk
+from deepface import DeepFace
+import threading
 
 Ctk.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
 Ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -37,7 +39,7 @@ class App(Ctk.CTk):
         self.btn2 = Ctk.CTkButton(self.button_container, text="Stop", command=self.stop)
         self.btn2.pack(side="left", padx=50)
 
-        self.open_camera()
+        self.open_camera_thread()
         
     def start(self):
         print("Start button pressed")
@@ -46,10 +48,18 @@ class App(Ctk.CTk):
         #save it
         PilImage = ImageTk.getimage(image)
         PilImage.save("test.png")
+        result = DeepFace.verify(img1_path = "cunha.png", img2_path = "test.png")
+        
+        print(result)
+
         
     def stop(self):
         print("Stop button pressed")
-        
+    
+    def open_camera_thread(self):
+        #open camera in a thread
+        threading.Thread(target=self.open_camera).start()
+
     def open_camera(self):
   
         # Capture the video frame by frame
