@@ -23,21 +23,7 @@ class App(Ctk.CTk):
         self.video_label.pack(expand=True, fill="both")
         
 
-        #create a frame and put it on the bottom as a bottom bar with 2 buttons
-        self.bottom_bar = Ctk.CTkFrame(self, height=300)
-        #pack it to the bottom
-        self.bottom_bar.pack(side="bottom", fill="x")
-        
-        
-        #button container
-        self.button_container = Ctk.CTkFrame(self.bottom_bar, fg_color="transparent",height=40)
-        self.button_container.pack( expand=True)
-        #2 buttons packed next to each other on the container
-        self.btn1 = Ctk.CTkButton(self.button_container, text="Start", command=self.start)
-        self.btn1.pack(side="left",padx=(0,50))
-        
-        self.btn2 = Ctk.CTkButton(self.button_container, text="Stop", command=self.stop)
-        self.btn2.pack(side="left", padx=50)
+
 
         self.open_camera_thread()
         
