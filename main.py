@@ -145,7 +145,8 @@ class App(Ctk.CTk):
         PilImage.save("tmp.png")
         result = DeepFace.verify(img1_path = "./db/"+self.user+"/user.png", img2_path = "tmp.png") #! CLEAN USER INPUT
 
-        print(result)
+        print("result: "+str(result["verified"])+" || original: ./db/"+self.user+"/user.png  <=> ./tmp.png" )
+
         if result["verified"]:
             self.fingerprint()
 
