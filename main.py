@@ -113,6 +113,7 @@ class App(Ctk.CTk):
 
         #detect faces on the image
         boxes = self.detect_faces(opencv_image)
+        self.boxes = boxes
 
         for (x,y,w,h) in boxes:
             cv2.rectangle(opencv_image,(x,y),(x+w,y+h),(0,0,255),3)
@@ -157,16 +158,22 @@ class App(Ctk.CTk):
 
 
     def faceVerify(self):
-        image = self.video_label.cget("image")
-        #save it
-        PilImage = ImageTk.getimage(image)
-        PilImage.save("tmp.png")
-        result = DeepFace.verify(img1_path = "./db/"+self.user+"/user.png", img2_path = "tmp.png") #! CLEAN USER INPUT
 
-        print("result: "+str(result["verified"])+" || original: ./db/"+self.user+"/user.png  <=> ./tmp.png" )
+        if len(self.boxes) == 1:
+            image = self.video_label.cget("image")
+            #save it
+            PilImage = ImageTk.getimage(image)
+            PilImage.save("tmp.png")
+            result = DeepFace.verify(img1_path = "./db/"+self.user+"/user.png", img2_path = "tmp.png") #! CLEAN USER INPUT
 
-        if result["verified"]:
-            self.fingerprint()
+            print("result: "+str(result["verified"])+" || original: ./db/"+self.user+"/user.png  <=> ./tmp.png" )
+
+            if result["verified"]:
+                self.fingerprint()
+            else:
+                self.PopUp("Face not recognized \n Try again")
+        else:
+            self.PopUp("No face detected or \n many faces detected \n Try again")
 
     
     def fingerprint(self):
