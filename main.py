@@ -4,6 +4,24 @@ from PIL import Image, ImageTk
 from deepface import DeepFace
 import os
 
+#DEFINE 
+X_POS=187
+Y_POS=97
+WIDTH=483
+HEIGHT=393
+
+MAX_X=155
+MAX_Y=65
+MAX_WIDTH=515
+MAX_HEIGHT=425
+
+MIN_X=220
+MIN_Y=130
+MIN_WIDTH=450
+MIN_HEIGHT=360
+
+
+
 Ctk.set_appearance_mode("Dark")   
 Ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
 
@@ -185,6 +203,11 @@ class App(Ctk.CTk):
         doneBtn = Ctk.CTkButton(self.frame , text="Done", command= lambda: self.loginPage() )
         doneBtn.place(x=480, y=540)
 
+    def PopUp(self,msg):
+        pop_up= Ctk.CTkToplevel(self)
+        pop_up.geometry("250x150+865+465")
+        pop_up.title("Warning")
+        label = Ctk.CTkLabel(pop_up, text= msg, font=('Arial',16)).place(x=125,y=75,anchor="center")
 
     ###############################
     #        REGISTER             #
@@ -221,7 +244,7 @@ class App(Ctk.CTk):
     def takePic(self):
         #! TESTS ONLY
         self.user= self.registNFC.get() #! CLEAR USER INPUT
-        print(self.user)
+        print("USER ID:",self.user)
         #! END TESTS ONLY
 
         for widget in self.frame.winfo_children():
@@ -238,16 +261,66 @@ class App(Ctk.CTk):
         nextBtn = Ctk.CTkButton(self.frame , text="Take Pic", command= lambda: self.registerFace() )
         nextBtn.place(x=610, y=540)
 
-        self.open_camera()
+        self.open_camera_register()
+
+    def open_camera_register(self):
+        # Capture the video frame by frame
+        _, frame = vid.read()
+    
+        # Convert image from one color space to other
+        opencv_image = frame
+
+        #detect faces on the image
+        boxes = self.detect_faces(opencv_image)
+        self.boxes = boxes
+
+        for (x,y,w,h) in boxes:
+            cv2.rectangle(opencv_image,(x,y),(x+w,y+h),(0,0,255),3)
+
+        cv2.rectangle(opencv_image,(X_POS,Y_POS),(WIDTH,HEIGHT),(0,255,0),3)
+
+        #cv2.rectangle(opencv_image,(MAX_X,MAX_Y),(MAX_WIDTH,MAX_HEIGHT),(0,0,0),3)
+        #cv2.rectangle(opencv_image,(MIN_X,MIN_Y),(MIN_WIDTH,MIN_HEIGHT),(255,0,0),3)
+            
+        #convert to good color space
+        opencv_image = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2RGB)
+        
+        # Capture the latest frame and transform to image
+        captured_image = Image.fromarray(opencv_image)
+
+        #mirror it
+        captured_image = captured_image.transpose(Image.FLIP_LEFT_RIGHT)
+        
+        # Convert captured image to photoimage
+        photo_image = ImageTk.PhotoImage(image=captured_image)
+     
+        # Configure image in the label
+        self.video_label.configure(image=photo_image)
+    
+        #repeat every 15ms
+        self.video_label.after(15, self.open_camera_register)
 
     def registerFace(self):
-        image = self.video_label.cget("image")
-        #save it
-        PilImage = ImageTk.getimage(image)
-        os.mkdir("./db/"+self.user) 
-        PilImage.save("./db/"+self.user+"/user.png")
+        
+        if len(self.boxes) == 1:
+            if (    (self.boxes[0][0]<= MIN_X and self.boxes[0][0] >= MAX_X) and 
+                    (self.boxes[0][1]<= MIN_Y and self.boxes[0][1] >= MAX_Y) and 
+                    (self.boxes[0][0]+self.boxes[0][2]>= MIN_WIDTH and self.boxes[0][2] <= MAX_WIDTH) and 
+                    (self.boxes[0][1]+self.boxes[0][3]>= MIN_HEIGHT and self.boxes[0][3] <= MAX_HEIGHT) ):
 
-        self.registerFingerprint()
+                image = self.video_label.cget("image")
+                #save it
+                PilImage = ImageTk.getimage(image)
+                os.mkdir("./db/"+self.user) 
+                PilImage.save("./db/"+self.user+"/user.png")
+                
+                self.registerFingerprint()
+
+            else:
+                self.PopUp("Please, take a picture \n with your face in the box")
+        else:
+            self.PopUp("Please, take a picture \n with only one face")
+
 
     
     def registerFingerprint(self):

@@ -6,7 +6,7 @@ TODO:
 - FINGERPRINT
   
 No regist deviamos obrigar a pessoa a tirar uma boa ft
-- dentro do quadrado
+- dentro do quadrado (DONE)
 - boa iluminaçao
 
 Testes: tirar 3 fts e ver se passa
