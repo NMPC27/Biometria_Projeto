@@ -289,6 +289,7 @@ class App(Ctk.CTk):
         camera_frame = utils.capture_frame(vid,raw=True)
 
         boxes = facedetection.detect_faces(camera_frame)
+        
         for (x,y,w,h) in boxes:
             cv2.rectangle(camera_frame,(x,y),(x+w,y+h),(0,0,255),3)
 

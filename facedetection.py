@@ -16,14 +16,14 @@ def detect_faces(img):
         Returns:
             list: List of bounding boxes
         """
-        # Convert to grayscale
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        # Load the cascade
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-        # Detect faces
-        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        try:
+            face_obj=DeepFace.extract_faces(img_path = img, detector_backend = 'ssd')
+        except:
+            return []
+        
+        facial_areas = [face["facial_area"] for face in face_obj]
+        return [[face["x"], face["y"], face["w"], face["h"]] for face in facial_areas]
 
-        return faces
 
 def registerFace(image,user):
     """
