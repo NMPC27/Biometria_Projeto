@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "biometriaApp",
+    "slug": "biometriaApp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "android.permission.NFC"
+      ],
+      "package": "com.cunha27.biometriaApp"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "react-native-nfc-manager"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c550b13f-d6c1-4b9d-8abf-f12bcb43ba09"
+      }
+    }
+  }
+}
