@@ -1,8 +1,12 @@
+from threading import Thread
 import customtkinter as Ctk
 import cv2
 from PIL import Image, ImageTk
 from deepface import DeepFace
 import os
+import time
+
+import numpy as np
 import utils
 import facedetection
 import nfc
@@ -34,7 +38,10 @@ class App(Ctk.CTk):
     def __init__(self,vid):
         super().__init__()
 
+        #video feed
         self.vid = vid
+        #image currently in the video label
+        self.img = None
         # configure window
         self.title("Biometria")
         self.geometry(f"{1100}x{580}")
@@ -151,49 +158,64 @@ class App(Ctk.CTk):
         #frame for the video feed
         self.video_label = Ctk.CTkLabel(self.frame, fg_color="transparent", bg_color="transparent", text="")
         self.video_label.place(x=250, y=30)
-        self.open_camera(register=True)
+        self.open_camera(register=register)
         cancelBtn = Ctk.CTkButton(self.frame , text="Cancel", command=lambda: self.entryPage() )
         cancelBtn.place(x=410, y=540)
 
-        nextBtn = Ctk.CTkButton(self.frame , text="Next")
-        nextBtn.place(x=610, y=540)
+        self.nextBtn = Ctk.CTkButton(self.frame , text="Next")
+        self.nextBtn.place(x=610, y=540)
 
-        if register:
-            nextBtn.configure(command= lambda: self.registerFace())
-        else:
-            nextBtn.configure(command= lambda:self.verifyFace())
+        #start the face detection thread with arg register
+        self.nextBtn.configure(command= lambda:Thread(target=self.face_detection, args=(register,)).start())
 
-
-
-
-    #!LIVELINESS é AQUI
-    #! o deepface tem uma cena de ler emocoes
-    #! vamos gerar random tipo (sorria, cara de mau, etc) e dps ver se a pessoa faz a expressao
-    def registerFace(self):
-        """	
-        Register a face in the database
-        """
-        user=self.user
-        #capture image from video feed
-        image = utils.capture_frame(vid, raw=True)
-        success, error = facedetection.registerFace(image, user)
-        if success:
-            self.fingerprint(register=True)
-        else:
-            self.PopUp(error)
-
-    def verifyFace(self):
+    def face_detection(self, register):
         """
         Verify user face
         """
         user=self.user
-        #capture image from video feed
-        image = utils.capture_frame(vid, raw=True)
-        success, error = facedetection.faceVerify(image, user)
-        if success:
-            self.fingerprint()
+        #disable button
+        self.nextBtn.configure(state="disabled")
+        #start a timer
+        start = time.time()
+        blinks = 0
+        last_blink = start
+        last_image = self.img
+
+        liveness = False
+        while not liveness and time.time() - start < 10:
+            #skip if no new image
+            if self.img is last_image:
+                continue
+
+            blink_detected = facedetection.blink(self.img)
+            #last blink was more than 0.5s ago
+            if blink_detected and time.time() - last_blink > 0.5:
+                blinks += 1
+                last_blink = time.time()
+            
+            #if 2 blinks detected in 10s
+            # print(blinks)
+            if blinks >= 2:
+                liveness = True
+
+        if not liveness:
+            self.PopUp("Liveness test failed")
+            self.nextBtn.configure(state="normal")
+            return
         else:
-            self.PopUp(error)
+            #wait for image without eyes closed
+            time.sleep(0.5)
+            if register:
+                success, error = facedetection.registerFace(self.img, user)
+            else:
+                success, error = facedetection.faceVerify(self.img, user)
+
+            if success:
+                self.fingerprint(register=register)
+            else:
+                self.PopUp(error)
+                self.nextBtn.configure(state="normal")
+                return
 
 
     def fingerprint(self, register=False):
@@ -287,19 +309,28 @@ class App(Ctk.CTk):
         """
         
         camera_frame = utils.capture_frame(vid,raw=True)
+        #let this be acessible to other functions
+        #!change brightness change second value
+        # cv2.normalize(camera_frame, camera_frame, 0, 200, cv2.NORM_MINMAX)
+        #!noise reduction
+        camera_frame = cv2.GaussianBlur(camera_frame, (5, 5), 0)
 
-        boxes = facedetection.detect_faces(camera_frame)
+        self.img = camera_frame
+
+        image = camera_frame.copy()
+        boxes = facedetection.detect_faces(image)
         
         for (x,y,w,h) in boxes:
-            cv2.rectangle(camera_frame,(x,y),(x+w,y+h),(0,0,255),3)
+            cv2.rectangle(image,(x,y),(x+w,y+h),(0,0,255),3)
 
         if register:
-            cv2.rectangle(camera_frame,(X_POS,Y_POS),(WIDTH,HEIGHT),(0,255,0),3)
+            cv2.rectangle(image,(X_POS,Y_POS),(WIDTH,HEIGHT),(0,255,0),3)
 
-        camera_frame = utils.convert_to_photoimage(camera_frame)
+
+        image = utils.convert_to_photoimage(image)
   
         # put image in the label
-        self.video_label.configure(image=camera_frame)
+        self.video_label.configure(image=image)
         #repeat every 15ms
         if register:
             self.video_label.after(15, self.open_camera, True)
@@ -310,5 +341,11 @@ class App(Ctk.CTk):
 
 if __name__ == "__main__":
     vid = cv2.VideoCapture(0)
+    #change exposure
+    
     app = App(vid)
+
+    pid = os.getpid()
+    app.protocol("WM_DELETE_WINDOW", lambda: os.system(f"taskkill /pid {pid} /f"))
+
     app.mainloop()

@@ -2,3 +2,6 @@ customtkinter
 opencv-python
 deepface
 pillow
+scipy
+dlib
+imutils

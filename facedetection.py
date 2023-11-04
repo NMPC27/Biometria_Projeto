@@ -3,9 +3,14 @@ import os
 from deepface import DeepFace
 from PIL import ImageTk, Image
 import utils
+import dlib
+from imutils import face_utils
 
 
-#TODO replace with deepface.extract_faces
+
+dlib_detector = dlib.get_frontal_face_detector()
+landmark_predictor = dlib.shape_predictor("./model/shape_predictor_68_face_landmarks.dat")
+
 def detect_faces(img):
         """
         Detects faces in an image and returns the coordinates of the bounding boxes
@@ -42,10 +47,19 @@ def registerFace(image,user):
     if len(face_obj) > 1:
         return False, "More than one face detected"
 
-    #!falta ver a box verde
-    #posicao ta em face_obj[0] qq coisa
+    #face must be around green box
+    X_POS=187 -30
+    Y_POS=97 - 30
+    WIDTH=483 + 30
+    HEIGHT=483 + 30
 
+    facial_area = face_obj[0]["facial_area"]
+    if facial_area["x"] < X_POS or facial_area["y"] < Y_POS or facial_area["x"]+facial_area["w"] > X_POS+WIDTH or facial_area["y"]+facial_area["h"] > Y_POS+HEIGHT:
+        return False, "Face not inside the box"
 
+    if blink(image):
+        return False, "Eyes closed!"
+    
     #save the selfie
     image = utils.convert_to_photoimage(image)      
     image = ImageTk.getimage(image)
@@ -87,3 +101,36 @@ def faceVerify(image,user):
             return False, "Face not recognized"
     else:
         return False , "Face not detected or more than one face detected"
+    
+
+def blink(image):
+    """
+    Verifies if blink is detected
+
+    Args:
+        image (Matlike): Image to verify
+
+    Returns:
+        int: 1 if blink detected, 0 otherwise
+    """
+    img_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    faces = dlib_detector(img_gray, 0)
+    if len(faces) == 0 or len(faces) > 1:
+        return 0
+    
+    face = faces[0]
+    landmarks = landmark_predictor(img_gray, face)
+    landmarks = face_utils.shape_to_np(landmarks)
+
+    left_eye = landmarks[36:42]
+    right_eye = landmarks[42:48]
+
+    left_eye_aspect_ratio = utils.eye_aspect_ratio(left_eye)
+    right_eye_aspect_ratio = utils.eye_aspect_ratio(right_eye)
+
+    eye_aspect_ratio = (left_eye_aspect_ratio + right_eye_aspect_ratio) / 2
+    if eye_aspect_ratio < 0.2:
+        return 1
+    else:
+        return 0
+
