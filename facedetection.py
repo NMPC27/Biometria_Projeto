@@ -88,7 +88,7 @@ def faceVerify(image,user):
         image (Matlike): Image to verify
         user (str): User ID
     """
-    face_obj=DeepFace.extract_faces(img_path = image, detector_backend = 'retinaface')
+    face_obj=DeepFace.extract_faces(img_path = image, detector_backend = 'ssd')
 
 
     if len(face_obj) == 1:

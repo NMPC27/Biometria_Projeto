@@ -9,8 +9,14 @@ import time
 import numpy as np
 import utils
 import facedetection
-import nfc
 import fingerprint
+import requests
+import json
+
+
+endpoint = 'https://biometriapp.nunompcunha2001.workers.dev/'
+TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2OTkxMTAzMDAsImV4cCI6MTczMDY0NjMwMCwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwic3ViIjoianJvY2tldEBleGFtcGxlLmNvbSIsIkdpdmVuTmFtZSI6IkpvaG5ueSIsIlN1cm5hbWUiOiJSb2NrZXQiLCJFbWFpbCI6Impyb2NrZXRAZXhhbXBsZS5jb20iLCJSb2xlIjpbIk1hbmFnZXIiLCJQcm9qZWN0IEFkbWluaXN0cmF0b3IiXX0.lRJ3CpOEdegZ4d45xTtUx3VvboPMcl4LQcvVv79IL0s"
+
 
 #DEFINE 
 X_POS=187
@@ -50,7 +56,7 @@ class App(Ctk.CTk):
         self.frame = Ctk.CTkFrame(master=self,width=1100, height=580)
         self.frame.place(x=0, y=0)
 
-        self.entryPage()
+        self.nfc()
 
     
     def PopUp(self,msg):
@@ -63,21 +69,7 @@ class App(Ctk.CTk):
         pop_up= Ctk.CTkToplevel(self)
         pop_up.geometry("250x150+865+465")
         pop_up.title("Warning")
-        label = Ctk.CTkLabel(pop_up, text= msg, font=('Arial',16)).place(x=125,y=75,anchor="center")
-
-    def entryPage(self):
-        """
-        Page with login and register buttons
-        """
-        self.user=None
-
-        for widget in self.frame.winfo_children():
-            widget.destroy()
-            
-        loginBtn = Ctk.CTkButton(self.frame , text="Login", command= lambda: self.nfc(register=False))
-        loginBtn.place(x=410,  y=280)
-        registerBtn = Ctk.CTkButton(self.frame , text="Register", command=lambda: self.nfc(register=True) )
-        registerBtn.place(x=610,  y=280)
+        Ctk.CTkLabel(pop_up, text= msg, font=('Arial',16)).place(x=125,y=75,anchor="center")
 
 
     
@@ -88,6 +80,8 @@ class App(Ctk.CTk):
         Args:
             register (bool, optional): If true, register a new user. Defaults to False.
         """
+        self.user=None
+
         #clear frame
         for widget in self.frame.winfo_children():
             widget.destroy()
@@ -101,41 +95,27 @@ class App(Ctk.CTk):
         nfc_label = Ctk.CTkLabel(master=self.frame, image=nfcImg, text='')
         nfc_label.place(x=400, y=200)
 
+        self.after(1000, self.getNfc) 
 
-        cancelBtn = Ctk.CTkButton(self.frame , text="Cancel", command=lambda: self.entryPage() )
-        cancelBtn.place(x=410, y=540)
+    def getNfc(self):
+        res = requests.get(endpoint)
+        tmp = json.loads(res.text)
+        id = tmp["currentId"] 
 
-        nextBtn = Ctk.CTkButton(self.frame , text="Next", state="disabled")
-        nextBtn.place(x=610, y=540)
+        print(id)
 
+        if id != "NULL":
+            self.user = id
 
-        #*depois ver como se faz o loop para verificar se o nfc foi lido
-        #* funciona como teste, dá sempre 1, True
-        if register:
-            user, success = nfc.nfc_register()
-            if success:
-                self.user = user
-                nextBtn.configure(state="normal")
-                nextBtn.configure(command= lambda: self.faceRecognition(register=True))
-                
+            if id in os.listdir("./db"): #login
+                requests.post(endpoint, data=json.dumps({"token": TOKEN, "id": "NULL"})) 
+                self.faceRecognition(register=False)
+            else: #registar
+                requests.post(endpoint, data=json.dumps({"token": TOKEN, "id": "NULL"})) 
+                self.faceRecognition(register=True)
+
         else:
-            user, success = nfc.nfc_login()
-            if success:
-                self.user = user
-                nextBtn.configure(state="normal")
-                nextBtn.configure(command= lambda: self.faceRecognition(register=False))
-            else:
-                self.PopUp("Invalid NFC ID")
-        
-
-        # #! TESTS ONLY
-        # nextBtn = Ctk.CTkButton(self.frame , text="TEST NEXT", command= lambda: self.faceRecognition())
-        # nextBtn.place(x=610,  y=510)
-        
-        #?override card reader
-        self.nfcInput = Ctk.CTkEntry(self.frame, placeholder_text="NFC ID -> put '1' ")
-        self.nfcInput.place(x=400, y=200)
-        # #! END TESTS ONLY
+            self.after(1000, self.getNfc) 
 
 
     def faceRecognition(self, register=False):
@@ -145,11 +125,6 @@ class App(Ctk.CTk):
         Args:
             register (bool, optional): If true, register a new user. Defaults to False.
         """
-        #! TESTS ONLY
-        nfcinput = self.nfcInput.get() #! CLEAR USER INPUT
-        self.user = nfcinput if nfcinput != "" else "1"
-        print(self.user)
-        #! END TESTS ONLY
 
         #clear frame
         for widget in self.frame.winfo_children():
@@ -159,7 +134,7 @@ class App(Ctk.CTk):
         self.video_label = Ctk.CTkLabel(self.frame, fg_color="transparent", bg_color="transparent", text="")
         self.video_label.place(x=250, y=30)
         self.open_camera(register=register)
-        cancelBtn = Ctk.CTkButton(self.frame , text="Cancel", command=lambda: self.entryPage() )
+        cancelBtn = Ctk.CTkButton(self.frame , text="Cancel", command=lambda: self.nfc() )
         cancelBtn.place(x=410, y=540)
 
         self.nextBtn = Ctk.CTkButton(self.frame , text="Next")
@@ -234,7 +209,7 @@ class App(Ctk.CTk):
         finger_label = Ctk.CTkLabel(master=self.frame, image=fingerImg, text='')
         finger_label.place(x=422, y=162)
 
-        cancelBtn = Ctk.CTkButton(self.frame , text="Cancel", command=lambda: self.entryPage())
+        cancelBtn = Ctk.CTkButton(self.frame , text="Cancel", command=lambda: self.nfc())
         cancelBtn.place(x=410, y=540)
 
         nextBtn = Ctk.CTkButton(self.frame , text="Next", state="disabled")
@@ -278,7 +253,7 @@ class App(Ctk.CTk):
         user_label = Ctk.CTkLabel(master=self.frame, image=userImg, text='')
         user_label.place(x=422, y=162)
 
-        doneBtn = Ctk.CTkButton(self.frame , text="Done", command= lambda: self.entryPage() )
+        doneBtn = Ctk.CTkButton(self.frame , text="Done", command= lambda: self.nfc() )
         doneBtn.place(x=480, y=540)
 
     def userPage(self):
@@ -295,7 +270,7 @@ class App(Ctk.CTk):
         user_label = Ctk.CTkLabel(master=self.frame, image=userImg, text='')
         user_label.place(x=422, y=162)
 
-        doneBtn = Ctk.CTkButton(self.frame , text="Done", command= lambda: self.entryPage() )
+        doneBtn = Ctk.CTkButton(self.frame , text="Done", command= lambda: self.nfc() )
         doneBtn.place(x=480, y=540)
         self.open_camera()
 
