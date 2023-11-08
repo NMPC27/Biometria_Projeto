@@ -5,3 +5,4 @@ pillow
 scipy
 dlib
 imutils
+adafruit-circuitpython-fingerprint==2.2.0

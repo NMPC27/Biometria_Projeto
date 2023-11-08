@@ -56,8 +56,14 @@ class App(Ctk.CTk):
         self.frame = Ctk.CTkFrame(master=self,width=1100, height=580)
         self.frame.place(x=0, y=0)
 
-        self.nfc()
-
+        # self.nfc()
+        
+        #!dont remove
+        self.cancel_handle = None
+        #!DEBUG
+        self.user = "0"
+        # self.faceRecognition(register=True)
+        self.fingerprint(register=True)
     
     def PopUp(self,msg):
         """
@@ -150,29 +156,66 @@ class App(Ctk.CTk):
         user=self.user
         #disable button
         self.nextBtn.configure(state="disabled")
-        #start a timer
-        start = time.time()
-        blinks = 0
-        last_blink = start
-        last_image = self.img
 
+
+        last_image = self.img
+        
+        #calibrate eyes values
+        start = time.time()
+        average = 0
+        count = 0
+        while time.time() - start < 1:
+            #skip if no new image
+            if self.img is last_image:
+                continue
+            #get eyes closed value
+            average += facedetection.get_eyes_aspect_ratio(self.img)[0]
+            count += 1        
+        average = average/count
+        print(average)
+        
+        
+        start = time.time()
+        last_blink = start
+        blinks = 0
         liveness = False
         while not liveness and time.time() - start < 10:
             #skip if no new image
             if self.img is last_image:
                 continue
 
-            blink_detected = facedetection.blink(self.img)
+            blink_detected, left_eye, right_eye = facedetection.blink(self.img, average)
             #last blink was more than 0.5s ago
             if blink_detected and time.time() - last_blink > 0.5:
                 blinks += 1
                 last_blink = time.time()
             
+            
+            #!DEBUG / RELATORIO #####################
+            # self.video_label.after_cancel(self.cancel_handle)
+            # #draw blinks
+            # image = self.img            
+            # leftEyeHull = cv2.convexHull(left_eye)
+            # rightEyeHull = cv2.convexHull(right_eye)
+
+            # cv2.drawContours(image, [leftEyeHull], -1, (255, 0, 0), 2)
+            # cv2.drawContours(image, [rightEyeHull], -1, (255, 0, 0), 2)
+            
+            # self.video_label.configure(image=utils.convert_to_photoimage(image))
+            
+            # self.open_camera(debug=True)
+            
+            #!#################################
+            
+            
             #if 2 blinks detected in 10s
             # print(blinks)
             if blinks >= 2:
                 liveness = True
-
+                
+        #!###dbeug
+        # self.cancel_handle =self.open_camera()
+        #!########
         if not liveness:
             self.PopUp("Liveness test failed")
             self.nextBtn.configure(state="normal")
@@ -181,7 +224,7 @@ class App(Ctk.CTk):
             #wait for image without eyes closed
             time.sleep(0.5)
             if register:
-                success, error = facedetection.registerFace(self.img, user)
+                success, error = facedetection.registerFace(self.img, user, average)
             else:
                 success, error = facedetection.faceVerify(self.img, user)
 
@@ -204,6 +247,8 @@ class App(Ctk.CTk):
         for widget in self.frame.winfo_children():
             widget.destroy()
 
+        self.finger_label= Ctk.CTkLabel(self.frame, text="Place your finger on the sensor when it flashes green",font=("Arial", 20))
+        self.finger_label.place(x=480, y=40)
 
         fingerImg = Ctk.CTkImage(light_image=Image.open("./img/finger.png"), size=(256 , 256))
         finger_label = Ctk.CTkLabel(master=self.frame, image=fingerImg, text='')
@@ -218,20 +263,20 @@ class App(Ctk.CTk):
         #*depois ver como se faz o loop para verificar se o sensor leu cenas
         #* funciona como teste, dá sempre 1, True
         if register:
-            user, success = fingerprint.fingerprint_register()
-            if success:
-                self.user = user
-                nextBtn.configure(state="normal")
-                nextBtn.configure(command= lambda: self.registDone())
+            Thread(target=fingerprint.fingerprint_register, args=(self.user, self.finger_label)).start()
+            # if success:
+            #     self.user = user
+            #     nextBtn.configure(state="normal")
+            #     nextBtn.configure(command= lambda: self.registDone())
                 
-        else:
-            user, success = fingerprint.fingerprint_login()
-            if success:
-                self.user = user
-                nextBtn.configure(state="normal")
-                nextBtn.configure(command= lambda: self.userPage())
-            else:
-                self.PopUp("Invalid fingerprint")
+        # else:
+        #     user, success = fingerprint.fingerprint_login()
+        #     if success:
+        #         self.user = user
+        #         nextBtn.configure(state="normal")
+        #         nextBtn.configure(command= lambda: self.userPage())
+        #     else:
+        #         self.PopUp("Invalid fingerprint")
 
 
         #! TESTS ONLY
@@ -275,12 +320,13 @@ class App(Ctk.CTk):
         self.open_camera()
 
 
-    def open_camera(self, register = False):
+    def open_camera(self, register = False, debug=False):
         """
         gets camera frame and puts it on video label, draw green rectangle if registering a new user
 
         Args:
             register (bool, optional): If true, draw green rectangle. Defaults to False.
+            debug (bool, optional): If true, dont repeat and dont set video label. Defaults to False.
         """
         
         camera_frame = utils.capture_frame(vid,raw=True)
@@ -302,15 +348,15 @@ class App(Ctk.CTk):
             cv2.rectangle(image,(X_POS,Y_POS),(WIDTH,HEIGHT),(0,255,0),3)
 
 
-        image = utils.convert_to_photoimage(image)
-  
-        # put image in the label
-        self.video_label.configure(image=image)
-        #repeat every 15ms
-        if register:
-            self.video_label.after(15, self.open_camera, True)
-        else:
-            self.video_label.after(15, self.open_camera)
+        if not debug:
+            image = utils.convert_to_photoimage(image)
+            # put image in the label
+            self.video_label.configure(image=image)
+            #repeat every 15ms
+            if register:
+                self.cancel_handle = self.video_label.after(15, self.open_camera, True)
+            else:
+                self.cancel_handle = self.video_label.after(15, self.open_camera)
 
 
 
@@ -321,6 +367,10 @@ if __name__ == "__main__":
     app = App(vid)
 
     pid = os.getpid()
-    app.protocol("WM_DELETE_WINDOW", lambda: os.system(f"taskkill /pid {pid} /f"))
+    #if windows
+    if os.name == "nt":
+        app.protocol("WM_DELETE_WINDOW", lambda: os.system(f"taskkill /pid {pid} /f"))
+    else:
+        app.protocol("WM_DELETE_WINDOW", lambda: os.system(f"kill {pid}"))
 
     app.mainloop()

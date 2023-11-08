@@ -30,13 +30,14 @@ def detect_faces(img):
         return [[face["x"], face["y"], face["w"], face["h"]] for face in facial_areas]
 
 
-def registerFace(image,user):
+def registerFace(image,user, average):
     """
     Registers a face in the database
 
     Args:
         image (Matlike): Image to register
         user (str): User ID
+        average (float): Average of the eye aspect ratio
     """
     
     #tell deepface to find faces
@@ -57,7 +58,7 @@ def registerFace(image,user):
     if facial_area["x"] < X_POS or facial_area["y"] < Y_POS or facial_area["x"]+facial_area["w"] > X_POS+WIDTH or facial_area["y"]+facial_area["h"] > Y_POS+HEIGHT:
         return False, "Face not inside the box"
 
-    if blink(image):
+    if blink(image, average)[0]:
         return False, "Eyes closed!"
     
     #save the selfie
@@ -88,38 +89,35 @@ def faceVerify(image,user):
         image (Matlike): Image to verify
         user (str): User ID
     """
-    face_obj=DeepFace.extract_faces(img_path = image, detector_backend = 'ssd')
 
 
-    if len(face_obj) == 1:
-        result = DeepFace.verify(img1_path = image, img2_path = f"./db/{user}/user.png", model_name = 'Facenet')
-        print(f"result: {result['verified']}")
 
-        if result["verified"]:
-            return True, "Face recognized"
-        else:
-            return False, "Face not recognized"
+    result = DeepFace.verify(img1_path = image, img2_path = f"./db/{user}/user.png", model_name = 'Facenet')
+    print(f"result: {result['verified']}")
+
+    if result["verified"]:
+        return True, "Face recognized"
     else:
-        return False , "Face not detected or more than one face detected"
-    
+        return False, "Face not recognized"
 
-def blink(image):
+
+def get_eyes_aspect_ratio(image):
     """
-    Verifies if blink is detected
+    Calculates the eye aspect ratio
 
     Args:
-        image (Matlike): Image to verify
+        image (Matlike): Image to calculate the eye aspect ratio
 
     Returns:
-        int: 1 if blink detected, 0 otherwise
+        float: Eye aspect ratio
     """
-    img_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    faces = dlib_detector(img_gray, 0)
+    # img_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    faces = dlib_detector(image, 0)
     if len(faces) == 0 or len(faces) > 1:
         return 0
     
     face = faces[0]
-    landmarks = landmark_predictor(img_gray, face)
+    landmarks = landmark_predictor(image, face)
     landmarks = face_utils.shape_to_np(landmarks)
 
     left_eye = landmarks[36:42]
@@ -129,8 +127,25 @@ def blink(image):
     right_eye_aspect_ratio = utils.eye_aspect_ratio(right_eye)
 
     eye_aspect_ratio = (left_eye_aspect_ratio + right_eye_aspect_ratio) / 2
-    if eye_aspect_ratio < 0.2:
-        return 1
+    return (eye_aspect_ratio, left_eye, right_eye)
+
+
+def blink(image, average):
+    """
+    Verifies if blink is detected
+
+    Args:
+        image (Matlike): Image to verify
+        average (float): Average of the eye aspect ratio
+
+    Returns:
+        int: 1 if blink detected, 0 otherwise
+        
+    """
+    eye_aspect_ratio, left_eye, right_eye = get_eyes_aspect_ratio(image)
+    # print(eye_aspect_ratio)
+    if eye_aspect_ratio < average * 0.8:
+        return 1, left_eye, right_eye
     else:
-        return 0
+        return 0, left_eye, right_eye
 
