@@ -56,14 +56,14 @@ class App(Ctk.CTk):
         self.frame = Ctk.CTkFrame(master=self,width=1100, height=580)
         self.frame.place(x=0, y=0)
 
-        # self.nfc()
+        self.nfc()
         
         #!dont remove
         self.cancel_handle = None
         #!DEBUG
         self.user = "0"
         # self.faceRecognition(register=True)
-        self.fingerprint(register=True)
+        # self.fingerprint(register=Tr0ue)
     
     def PopUp(self,msg):
         """
@@ -192,18 +192,18 @@ class App(Ctk.CTk):
             
             
             #!DEBUG / RELATORIO #####################
-            # self.video_label.after_cancel(self.cancel_handle)
-            # #draw blinks
-            # image = self.img            
-            # leftEyeHull = cv2.convexHull(left_eye)
-            # rightEyeHull = cv2.convexHull(right_eye)
+            self.video_label.after_cancel(self.cancel_handle)
+            #draw blinks
+            image = self.img            
+            leftEyeHull = cv2.convexHull(left_eye)
+            rightEyeHull = cv2.convexHull(right_eye)
 
-            # cv2.drawContours(image, [leftEyeHull], -1, (255, 0, 0), 2)
-            # cv2.drawContours(image, [rightEyeHull], -1, (255, 0, 0), 2)
+            cv2.drawContours(image, [leftEyeHull], -1, (255, 0, 0), 2)
+            cv2.drawContours(image, [rightEyeHull], -1, (255, 0, 0), 2)
             
-            # self.video_label.configure(image=utils.convert_to_photoimage(image))
+            self.video_label.configure(image=utils.convert_to_photoimage(image))
             
-            # self.open_camera(debug=True)
+            self.open_camera(debug=True)
             
             #!#################################
             
@@ -263,25 +263,17 @@ class App(Ctk.CTk):
         #*depois ver como se faz o loop para verificar se o sensor leu cenas
         #* funciona como teste, dá sempre 1, True
         if register:
-            Thread(target=fingerprint.fingerprint_register, args=(self.user, self.finger_label)).start()
-            # if success:
-            #     self.user = user
-            #     nextBtn.configure(state="normal")
-            #     nextBtn.configure(command= lambda: self.registDone())
-                
-        # else:
-        #     user, success = fingerprint.fingerprint_login()
-        #     if success:
-        #         self.user = user
-        #         nextBtn.configure(state="normal")
-        #         nextBtn.configure(command= lambda: self.userPage())
-        #     else:
-        #         self.PopUp("Invalid fingerprint")
+            Thread(target=fingerprint.fingerprint_register, args=(self.user, self.finger_label, nextBtn)).start()
+            nextBtn.configure(command= lambda: self.registDone())
+        else:
+            Thread(target=fingerprint.fingerprint_login, args=(self.user, self.finger_label, nextBtn)).start()
+            nextBtn.configure(command= lambda: self.userPage())
+
 
 
         #! TESTS ONLY
-        nextBtn = Ctk.CTkButton(self.frame , text="TEST NEXT", command= lambda: self.userPage())
-        nextBtn.place(x=610,  y=510)
+        nextBtntest = Ctk.CTkButton(self.frame , text="TEST NEXT", command= lambda: self.userPage())
+        nextBtntest.place(x=610,  y=510)
         
         
     def registDone(self):
@@ -291,7 +283,7 @@ class App(Ctk.CTk):
         for widget in self.frame.winfo_children():
             widget.destroy()
 
-        label = Ctk.CTkLabel(self.frame, text="Regist Successful!", text_color="green",font=("Arial", 20))
+        label = Ctk.CTkLabel(self.frame, text="Successfully registered!", text_color="green",font=("Arial", 20))
         label.place(x=450, y=40)
 
         userImg = Ctk.CTkImage(light_image=Image.open("./img/register.png"), size=(256 , 256))
@@ -361,7 +353,7 @@ class App(Ctk.CTk):
 
 
 if __name__ == "__main__":
-    vid = cv2.VideoCapture(0)
+    vid = cv2.VideoCapture(2)
     #change exposure
     
     app = App(vid)

@@ -16,7 +16,7 @@ from PIL import Image
 # If using with Linux/Raspberry Pi and hardware UART:
 import serial
 
-uart = serial.Serial("/dev/ttyUSB1", baudrate=57600, timeout=1)
+uart = serial.Serial("/dev/ttyUSB0", baudrate=57600, timeout=1)
 # uart = serial.Serial("/dev/ttyS0", baudrate=57600, timeout=1)
 finger = adafruit_fingerprint.Adafruit_Fingerprint(uart)
 

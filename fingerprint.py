@@ -38,48 +38,56 @@ def clear_sensor():
         else:
             print("Failed to delete model", i)
 
-def enroll_finger(idx,finger_label):
+def enroll_finger(idx,finger_label, nextbutton):
     
-    for fingerimage in range(1,4):
-        if fingerimage == 1:
-            finger_label.configure(text="Place your finger on the sensor")
-        else:
-            finger_label.configure(text="Place your finger again")
+    success = False
+    while not success:
+        time.sleep(3)
+        for fingerimage in range(1,4):
+            if fingerimage == 1:
+                finger_label.configure(text="Place your finger on the sensor")
+            else:
+                finger_label.configure(text="Place your finger again")
+                
+            while True:
+                i = finger.get_image()
+                if i == adafruit_fingerprint.OK:
+                    break
             
-        while True:
-            i = finger.get_image()
-            if i == adafruit_fingerprint.OK:
-                break
+            print("Templating...")
+            if finger.image_2_tz(fingerimage) != adafruit_fingerprint.OK:
+                finger_label.configure(text="Failed to template")
+                continue
+                
+                
+            
+            finger_label.configure(text="Remove your finger")
+            while finger.get_image() != adafruit_fingerprint.NOFINGER:
+                pass
+            
+            time.sleep(1)
+            
+        print("Creating model...")
+        if finger.create_model() != adafruit_fingerprint.OK:
+            finger_label.configure(text="Failed to create model")
+            continue
         
-        print("Templating...")
-        if finger.image_2_tz(fingerimage) != adafruit_fingerprint.OK:
-            print("Failed to template")
-            return False
-        
-        finger_label.configure(text="Remove your finger")
-        while finger.get_image() != adafruit_fingerprint.NOFINGER:
-            pass
-        
-        time.sleep(1)
-        
-    print("Creating model...")
-    if finger.create_model() != adafruit_fingerprint.OK:
-        print("Failed to create model")
-        return False
+        print("Storing model")
+        if finger.store_model(idx) != adafruit_fingerprint.OK:
+            finger_label.configure(text="Failed to store model")
+            continue
     
-    print("Storing model")
-    if finger.store_model(idx) != adafruit_fingerprint.OK:
-        print("Failed to store model")
-        return False
-    
-    print("Stored")
-    return True
+        print("Stored")
+        success = True
+        
+    finger_label.configure(text="Fingerprint registered, press next")
+    nextbutton.configure(state="normal")
         
         
         
         
             
-def fingerprint_register(user, finger_label):
+def fingerprint_register(user, finger_label, nextbutton):
     
     finger.read_templates()
     if len(finger.templates) == 0:
@@ -112,9 +120,39 @@ def fingerprint_register(user, finger_label):
             f.write(str(idx))
     
     #enroll fingerprint
-    enroll_finger(idx, finger_label)
+    enroll_finger(idx, finger_label,nextbutton)
     
 
+def fingerprint_login(user,label,nextbutton):
+    
+    #go into /db/user and read fingerid.txt
+    #fingerid.txt will contain the fingerprint id
+    f = open("./db/"+user+"/fingerid.txt", "r")
+    sensor_idx = int(f.read())
+    f.close()
+    
+    #read fingerprint
+    success = False
+    while not success:
+        time.sleep(3)
+        label.configure(text="Place your finger on the sensor")
+        while finger.get_image() != adafruit_fingerprint.OK:
+            pass
+        
+        print("Templating...")
+        if finger.image_2_tz(1) != adafruit_fingerprint.OK:
+            label.configure(text="Failed to template")
+            continue
+        print("Searching...")
+        
+        finger.finger_search()
+        if finger.finger_id == sensor_idx:
+            label.configure(text="Fingerprint matched, press next")
+            nextbutton.configure(state="normal")
+            success = True
+        else:
+            label.configure(text="Fingerprint not matched, wait for instruction")
+            continue
 
 if __name__ == "__main__":
     finger.read_templates()
