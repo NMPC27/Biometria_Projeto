@@ -16,8 +16,7 @@ import json
 
 endpoint = 'https://biometriapp.nunompcunha2001.workers.dev/'
 TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2OTkxMTAzMDAsImV4cCI6MTczMDY0NjMwMCwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwic3ViIjoianJvY2tldEBleGFtcGxlLmNvbSIsIkdpdmVuTmFtZSI6IkpvaG5ueSIsIlN1cm5hbWUiOiJSb2NrZXQiLCJFbWFpbCI6Impyb2NrZXRAZXhhbXBsZS5jb20iLCJSb2xlIjpbIk1hbmFnZXIiLCJQcm9qZWN0IEFkbWluaXN0cmF0b3IiXX0.lRJ3CpOEdegZ4d45xTtUx3VvboPMcl4LQcvVv79IL0s"
-
-
+gamma = 1.0
 #DEFINE 
 X_POS=187
 Y_POS=97
@@ -184,7 +183,7 @@ class App(Ctk.CTk):
             if self.img is last_image:
                 continue
 
-            blink_detected, left_eye, right_eye = facedetection.blink(self.img, average)
+            blink_detected, _, _ = facedetection.blink(self.img, average)
             #last blink was more than 0.5s ago
             if blink_detected and time.time() - last_blink > 0.5:
                 blinks += 1
@@ -192,18 +191,18 @@ class App(Ctk.CTk):
             
             
             #!DEBUG / RELATORIO #####################
-            self.video_label.after_cancel(self.cancel_handle)
-            #draw blinks
-            image = self.img            
-            leftEyeHull = cv2.convexHull(left_eye)
-            rightEyeHull = cv2.convexHull(right_eye)
+            # self.video_label.after_cancel(self.cancel_handle)
+            # #draw blinks
+            # image = self.img            
+            # leftEyeHull = cv2.convexHull(left_eye)
+            # rightEyeHull = cv2.convexHull(right_eye)
 
-            cv2.drawContours(image, [leftEyeHull], -1, (255, 0, 0), 2)
-            cv2.drawContours(image, [rightEyeHull], -1, (255, 0, 0), 2)
+            # cv2.drawContours(image, [leftEyeHull], -1, (255, 0, 0), 2)
+            # cv2.drawContours(image, [rightEyeHull], -1, (255, 0, 0), 2)
             
-            self.video_label.configure(image=utils.convert_to_photoimage(image))
+            # self.video_label.configure(image=utils.convert_to_photoimage(image))
             
-            self.open_camera(debug=True)
+            # self.open_camera(debug=True)
             
             #!#################################
             
@@ -216,6 +215,7 @@ class App(Ctk.CTk):
         #!###dbeug
         # self.cancel_handle =self.open_camera()
         #!########
+        
         if not liveness:
             self.PopUp("Liveness test failed")
             self.nextBtn.configure(state="normal")
@@ -326,8 +326,14 @@ class App(Ctk.CTk):
         #!change brightness change second value
         # cv2.normalize(camera_frame, camera_frame, 0, 200, cv2.NORM_MINMAX)
         #!noise reduction
-        camera_frame = cv2.GaussianBlur(camera_frame, (5, 5), 0)
 
+        #adjust  gamma
+        invGamma = 1.0 / gamma
+        table = np.array([((i / 255.0) ** invGamma) * 255
+            for i in np.arange(0, 256)]).astype("uint8")
+        camera_frame = cv2.LUT(camera_frame, table)
+
+        
         self.img = camera_frame
 
         image = camera_frame.copy()
@@ -355,6 +361,32 @@ class App(Ctk.CTk):
 if __name__ == "__main__":
     vid = cv2.VideoCapture(2)
     #change exposure
+    #show camera feed
+    gamma = 1.0
+    while True:
+        ret, frame = vid.read()
+        frame = cv2.flip(frame, 1)
+        
+               #adjust  gamma
+        invGamma = 1.0 / gamma
+        table = np.array([((i / 255.0) ** invGamma) * 255
+            for i in np.arange(0, 256)]).astype("uint8")
+        frame = cv2.LUT(frame, table)
+        # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+        cv2.imshow("frame", frame)
+        key = cv2.waitKey(1)
+        if key & 0xFF == ord('q'):
+            break
+        elif key == ord('d'):
+            gamma += 0.1
+            print(gamma)
+        elif key == ord('a'):
+            gamma -= 0.1
+            print(gamma)
+        
+    cv2.destroyAllWindows()
+    
     
     app = App(vid)
 
