@@ -22,7 +22,7 @@ def detect_faces(img):
             list: List of bounding boxes
         """
         try:
-            face_obj=DeepFace.extract_faces(img_path = img, detector_backend = 'ssd')
+            face_obj=DeepFace.extract_faces(img_path = img, detector_backend = 'opencv')
         except:
             return []
         

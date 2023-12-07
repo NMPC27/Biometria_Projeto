@@ -1,21 +1,20 @@
-from threading import Thread
-import customtkinter as Ctk
-import cv2
-from PIL import Image, ImageTk
-from deepface import DeepFace
+import json
 import os
 import time
+from threading import Thread
 
+import customtkinter as Ctk
+import cv2
 import numpy as np
-import utils
+import requests
+from deepface import DeepFace
+from PIL import Image, ImageTk
+
 import facedetection
 import fingerprint
-import requests
-import json
+import utils
+import nfc
 
-
-endpoint = 'https://biometriapp.nunompcunha2001.workers.dev/'
-TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2OTkxMTAzMDAsImV4cCI6MTczMDY0NjMwMCwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwic3ViIjoianJvY2tldEBleGFtcGxlLmNvbSIsIkdpdmVuTmFtZSI6IkpvaG5ueSIsIlN1cm5hbWUiOiJSb2NrZXQiLCJFbWFpbCI6Impyb2NrZXRAZXhhbXBsZS5jb20iLCJSb2xlIjpbIk1hbmFnZXIiLCJQcm9qZWN0IEFkbWluaXN0cmF0b3IiXX0.lRJ3CpOEdegZ4d45xTtUx3VvboPMcl4LQcvVv79IL0s"
 gamma = 1.0
 #DEFINE 
 X_POS=187
@@ -47,21 +46,24 @@ class App(Ctk.CTk):
         self.vid = vid
         #image currently in the video label
         self.img = None
+        self.index = 0
+        #last drawn boxes
+        self.boxes = None
         # configure window
-        self.title("Biometria")
+        self.title("Biometria App")
         self.geometry(f"{1100}x{580}")
         self.resizable(False, False)
 
         self.frame = Ctk.CTkFrame(master=self,width=1100, height=580)
         self.frame.place(x=0, y=0)
 
-        self.nfc()
+        # self.nfc()
         
         #!dont remove
         self.cancel_handle = None
         #!DEBUG
-        self.user = "0"
-        # self.faceRecognition(register=True)
+        # self.user = "0"
+        self.faceRecognition(register=True)
         # self.fingerprint(register=Tr0ue)
     
     def PopUp(self,msg):
@@ -85,6 +87,7 @@ class App(Ctk.CTk):
         Args:
             register (bool, optional): If true, register a new user. Defaults to False.
         """
+        #keep track of user
         self.user=None
 
         #clear frame
@@ -92,35 +95,40 @@ class App(Ctk.CTk):
             widget.destroy()
 
 
-        #* Please use the NFC reader
-        label = Ctk.CTkLabel(self.frame, text="Enter your NFC ID",font=("Arial", 20))
-        label.place(x=480, y=40)
+        label = Ctk.CTkLabel(self.frame, text="Please use the NFC Reader to scan your card",font=("Arial", 20))
+        #place this on top in the middle
+        label.place(x=550, y=40, anchor="center")
         
         nfcImg = Ctk.CTkImage(light_image=Image.open("./img/nfc.png"), size=(300 , 180))
         nfc_label = Ctk.CTkLabel(master=self.frame, image=nfcImg, text='')
-        nfc_label.place(x=400, y=200)
+        #place it in the middle
+        nfc_label.place(x=550, y=290, anchor="center")
 
-        self.after(1000, self.getNfc) 
-
-    def getNfc(self):
-        res = requests.get(endpoint)
-        tmp = json.loads(res.text)
-        id = tmp["currentId"] 
-
-        print(id)
-
-        if id != "NULL":
+        Thread(target=self.nfc_thread).start()
+    
+    def nfc_thread(self):
+        """
+        Check every second if a card has been scanned
+        
+        Args:
+            None
+        Returns:
+            None
+        """
+        id = nfc.get_id()
+        if id is not None:
             self.user = id
-
-            if id in os.listdir("./db"): #login
-                requests.post(endpoint, data=json.dumps({"token": TOKEN, "id": "NULL"})) 
+            #login
+            if id in os.listdir("./db"):
                 self.faceRecognition(register=False)
-            else: #registar
-                requests.post(endpoint, data=json.dumps({"token": TOKEN, "id": "NULL"})) 
+            #register
+            else:
                 self.faceRecognition(register=True)
-
         else:
-            self.after(1000, self.getNfc) 
+            self.after(1000, self.nfc_thread)
+            
+
+
 
 
     def faceRecognition(self, register=False):
@@ -137,13 +145,17 @@ class App(Ctk.CTk):
 
         #frame for the video feed
         self.video_label = Ctk.CTkLabel(self.frame, fg_color="transparent", bg_color="transparent", text="")
-        self.video_label.place(x=250, y=30)
+        #place on center
+        self.video_label.place(x=550, y=290, anchor="center")
         self.open_camera(register=register)
         cancelBtn = Ctk.CTkButton(self.frame , text="Cancel", command=lambda: self.nfc() )
-        cancelBtn.place(x=410, y=540)
-
         self.nextBtn = Ctk.CTkButton(self.frame , text="Next")
-        self.nextBtn.place(x=610, y=540)
+
+        #place the buttons on the bottom
+        cancelBtn.place(anchor="center", x=500, y=560)
+        self.nextBtn.place(anchor="center", x=600, y=560)
+
+
 
         #start the face detection thread with arg register
         self.nextBtn.configure(command= lambda:Thread(target=self.face_detection, args=(register,)).start())
@@ -327,19 +339,24 @@ class App(Ctk.CTk):
         # cv2.normalize(camera_frame, camera_frame, 0, 200, cv2.NORM_MINMAX)
         #!noise reduction
 
-        #adjust  gamma
-        invGamma = 1.0 / gamma
-        table = np.array([((i / 255.0) ** invGamma) * 255
-            for i in np.arange(0, 256)]).astype("uint8")
-        camera_frame = cv2.LUT(camera_frame, table)
+        # #adjust  gamma
+        # invGamma = 1.0 / gamma
+        # table = np.array([((i / 255.0) ** invGamma) * 255
+        #     for i in np.arange(0, 256)]).astype("uint8")
+        # camera_frame = cv2.LUT(camera_frame, table)
 
         
         self.img = camera_frame
 
         image = camera_frame.copy()
-        boxes = facedetection.detect_faces(image)
+        if self.index % 8 == 0:
+            self.boxes = facedetection.detect_faces(image)
+            self.index +=1
+        else:
+            self.index += 1
         
-        for (x,y,w,h) in boxes:
+        
+        for (x,y,w,h) in self.boxes:
             cv2.rectangle(image,(x,y),(x+w,y+h),(0,0,255),3)
 
         if register:
@@ -359,31 +376,31 @@ class App(Ctk.CTk):
 
 
 if __name__ == "__main__":
-    vid = cv2.VideoCapture(2)
+    vid = cv2.VideoCapture(0)
     #change exposure
     #show camera feed
     gamma = 1.0
-    while True:
-        ret, frame = vid.read()
-        frame = cv2.flip(frame, 1)
+    # while True:
+    #     ret, frame = vid.read()
+    #     frame = cv2.flip(frame, 1)
         
-               #adjust  gamma
-        invGamma = 1.0 / gamma
-        table = np.array([((i / 255.0) ** invGamma) * 255
-            for i in np.arange(0, 256)]).astype("uint8")
-        frame = cv2.LUT(frame, table)
-        # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-        cv2.imshow("frame", frame)
-        key = cv2.waitKey(1)
-        if key & 0xFF == ord('q'):
-            break
-        elif key == ord('d'):
-            gamma += 0.1
-            print(gamma)
-        elif key == ord('a'):
-            gamma -= 0.1
-            print(gamma)
+    #            #adjust  gamma
+    #     invGamma = 1.0 / gamma
+    #     table = np.array([((i / 255.0) ** invGamma) * 255
+    #         for i in np.arange(0, 256)]).astype("uint8")
+    #     frame = cv2.LUT(frame, table)
+    #     # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    #     # frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+    #     cv2.imshow("frame", frame)
+    #     key = cv2.waitKey(1)
+    #     if key & 0xFF == ord('q'):
+    #         break
+    #     elif key == ord('d'):
+    #         gamma += 0.1
+    #         print(gamma)
+    #     elif key == ord('a'):
+    #         gamma -= 0.1
+    #         print(gamma)
         
     cv2.destroyAllWindows()
     
