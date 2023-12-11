@@ -6,6 +6,7 @@ from digitalio import DigitalInOut, Direction
 import adafruit_fingerprint
 import subprocess
 import os
+import logging
 
 #change ttyusb1 to whatever scriptusb says
 #run ./scriptusb.sh
@@ -54,30 +55,33 @@ def enroll_finger(idx,finger_label, nextbutton):
                 if i == adafruit_fingerprint.OK:
                     break
             
-            print("Templating...")
-            if finger.image_2_tz(fingerimage) != adafruit_fingerprint.OK:
+            i = finger.image_2_tz(fingerimage)
+            if i != adafruit_fingerprint.OK:
                 finger_label.configure(text="Failed to template")
-                continue
+                if i == adafruit_fingerprint.IMAGEMESS:
+                    logging.error("Image too messy")
+                elif i == adafruit_fingerprint.FEATUREFAIL:
+                    logging.error("Could not identify features")
+                elif i == adafruit_fingerprint.INVALIDIMAGE:
+                    logging.error("Image invalid")
+                else:
+                    logging.error("Other error")
                 
-                
-            
+        
             finger_label.configure(text="Remove your finger")
             while finger.get_image() != adafruit_fingerprint.NOFINGER:
                 pass
             
-            time.sleep(1)
-            
-        print("Creating model...")
-        if finger.create_model() != adafruit_fingerprint.OK:
-            finger_label.configure(text="Failed to create model")
+            # time.sleep(1)
+        i = finger.create_model()
+        if i != adafruit_fingerprint.OK:
+            finger_label.configure(text="Prints did not match")
             continue
         
-        print("Storing model")
         if finger.store_model(idx) != adafruit_fingerprint.OK:
             finger_label.configure(text="Failed to store model")
             continue
-    
-        print("Stored")
+        logging.info(f"Stored model {idx}")
         success = True
         
     finger_label.configure(text="Fingerprint registered, press next")
@@ -121,6 +125,7 @@ def fingerprint_register(user, finger_label, nextbutton):
     
     #enroll fingerprint
     enroll_finger(idx, finger_label,nextbutton)
+    return True
     
 
 def fingerprint_login(user,label,nextbutton):
@@ -139,11 +144,9 @@ def fingerprint_login(user,label,nextbutton):
         while finger.get_image() != adafruit_fingerprint.OK:
             pass
         
-        print("Templating...")
         if finger.image_2_tz(1) != adafruit_fingerprint.OK:
             label.configure(text="Failed to template")
             continue
-        print("Searching...")
         
         finger.finger_search()
         if finger.finger_id == sensor_idx:
@@ -151,8 +154,9 @@ def fingerprint_login(user,label,nextbutton):
             nextbutton.configure(state="normal")
             success = True
         else:
-            label.configure(text="Fingerprint not matched, wait for instruction")
+            label.configure(text="Fingerprint didn't match, wait for instructions")
             continue
+    return True
 
 if __name__ == "__main__":
     finger.read_templates()

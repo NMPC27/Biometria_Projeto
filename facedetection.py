@@ -7,7 +7,6 @@ import dlib
 from imutils import face_utils
 
 
-
 dlib_detector = dlib.get_frontal_face_detector()
 landmark_predictor = dlib.shape_predictor("./model/shape_predictor_68_face_landmarks.dat")
 
@@ -101,20 +100,20 @@ def faceVerify(image,user):
         return False, "Face not recognized"
 
 
-def get_eyes_aspect_ratio(image):
+def get_eyes_aspect_ratio(image) -> tuple:
     """
-    Calculates the eye aspect ratio
+    Calculates the eye aspect ratio and returns the left and right eye coordinates
 
     Args:
         image (Matlike): Image to calculate the eye aspect ratio
 
     Returns:
-        float: Eye aspect ratio
+        tuple: Eye aspect ratio, left eye, right eye
     """
     # img_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     faces = dlib_detector(image, 0)
     if len(faces) == 0 or len(faces) > 1:
-        return 0
+        return 0, None, None
     
     face = faces[0]
     landmarks = landmark_predictor(image, face)

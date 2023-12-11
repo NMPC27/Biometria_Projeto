@@ -1,14 +1,13 @@
-import json
 import os
 import time
+import logging
 from threading import Thread
 
 import customtkinter as Ctk
 import cv2
 import numpy as np
 import requests
-from deepface import DeepFace
-from PIL import Image, ImageTk
+from PIL import Image
 
 import facedetection
 import fingerprint
@@ -57,14 +56,25 @@ class App(Ctk.CTk):
         self.frame = Ctk.CTkFrame(master=self,width=1100, height=580)
         self.frame.place(x=0, y=0)
 
-        # self.nfc()
+        self.nfc()
         
         #!dont remove
         self.cancel_handle = None
         #!DEBUG
         # self.user = "0"
-        self.faceRecognition(register=True)
+        # self.faceRecognition(register=True)
         # self.fingerprint(register=Tr0ue)
+    
+    def report_callback_exception(self, exc, val, tb):
+        """
+        Handles exceptions
+
+        Args:
+            exc (Exception): Exception type
+            val (Exception): Exception value
+            tb (traceback): traceback
+        """
+        pass
     
     def PopUp(self,msg):
         """
@@ -104,7 +114,7 @@ class App(Ctk.CTk):
         #place it in the middle
         nfc_label.place(x=550, y=290, anchor="center")
 
-        Thread(target=self.nfc_thread).start()
+        Thread(target=self.nfc_thread, daemon=True).start()
     
     def nfc_thread(self):
         """
@@ -116,13 +126,16 @@ class App(Ctk.CTk):
             None
         """
         id = nfc.get_id()
+        logging.info(f"ID: {id}")
         if id is not None:
             self.user = id
             #login
             if id in os.listdir("./db"):
+                logging.info("Login")
                 self.faceRecognition(register=False)
             #register
             else:
+                logging.info("Register")
                 self.faceRecognition(register=True)
         else:
             self.after(1000, self.nfc_thread)
@@ -152,52 +165,68 @@ class App(Ctk.CTk):
         self.nextBtn = Ctk.CTkButton(self.frame , text="Next")
 
         #place the buttons on the bottom
-        cancelBtn.place(anchor="center", x=500, y=560)
-        self.nextBtn.place(anchor="center", x=600, y=560)
+        cancelBtn.place(anchor="center", x=450, y=560)
+        self.nextBtn.place(anchor="center", x=650, y=560)
 
 
 
         #start the face detection thread with arg register
-        self.nextBtn.configure(command= lambda:Thread(target=self.face_detection, args=(register,)).start())
+        self.nextBtn.configure(command= lambda:Thread(target=self.face_detection, args=(register,),daemon=True).start())
 
     def face_detection(self, register):
         """
-        Verify user face
+        Performs liveness test and face recognition or registration
+        
+        Args:
+            register (bool): If true, register a new user. Defaults to False.
+        Returns:
+            None
         """
         user=self.user
         #disable button
         self.nextBtn.configure(state="disabled")
 
-
+        #use the last captured frame
         last_image = self.img
-        
+
         #calibrate eyes values
         start = time.time()
         average = 0
         count = 0
+        fails = 0
         while time.time() - start < 1:
             #skip if no new image
             if self.img is last_image:
                 continue
             #get eyes closed value
-            average += facedetection.get_eyes_aspect_ratio(self.img)[0]
-            count += 1        
-        average = average/count
-        print(average)
+            ear , _, _ = facedetection.get_eyes_aspect_ratio(self.img)
+            if ear == 0:
+                fails += 1
+            average += ear     
+            count += 1
+        if fails / count > 0.5:
+            logging.info(f"fails: {fails} count: {count}")
+            self.PopUp("Not enough values to calibrate eyes")
+            self.nextBtn.configure(state="normal")
+            return
         
+        average = average/count
+        logging.info(f"Eyes average: {average}")
         
         start = time.time()
         last_blink = start
         blinks = 0
         liveness = False
+        
         while not liveness and time.time() - start < 10:
             #skip if no new image
             if self.img is last_image:
                 continue
 
-            blink_detected, _, _ = facedetection.blink(self.img, average)
+            blink_detected, left_eye, right_eye = facedetection.blink(self.img, average)
             #last blink was more than 0.5s ago
             if blink_detected and time.time() - last_blink > 0.5:
+                logging.info("Blink detected")
                 blinks += 1
                 last_blink = time.time()
             
@@ -225,7 +254,7 @@ class App(Ctk.CTk):
                 liveness = True
                 
         #!###dbeug
-        # self.cancel_handle =self.open_camera()
+        # self.cancel_handle = self.open_camera()
         #!########
         
         if not liveness:
@@ -256,36 +285,60 @@ class App(Ctk.CTk):
             register (bool, optional): If true, register a new user. Defaults to False.
         """
 
+        #clear frame
+        #?this throws an exception but it is needed to clear the frame
         for widget in self.frame.winfo_children():
             widget.destroy()
-
+            
         self.finger_label= Ctk.CTkLabel(self.frame, text="Place your finger on the sensor when it flashes green",font=("Arial", 20))
-        self.finger_label.place(x=480, y=40)
+        self.finger_label.place(x=550, y=40, anchor="center")
 
         fingerImg = Ctk.CTkImage(light_image=Image.open("./img/finger.png"), size=(256 , 256))
         finger_label = Ctk.CTkLabel(master=self.frame, image=fingerImg, text='')
-        finger_label.place(x=422, y=162)
+        finger_label.place(x=550, y=290, anchor="center")
 
         cancelBtn = Ctk.CTkButton(self.frame , text="Cancel", command=lambda: self.nfc())
-        cancelBtn.place(x=410, y=540)
+        cancelBtn.place(x=450, y=540, anchor="center")
 
         nextBtn = Ctk.CTkButton(self.frame , text="Next", state="disabled")
-        nextBtn.place(x=610, y=540)
+        nextBtn.place(x=650, y=540, anchor="center")
 
-        #*depois ver como se faz o loop para verificar se o sensor leu cenas
-        #* funciona como teste, dá sempre 1, True
         if register:
-            Thread(target=fingerprint.fingerprint_register, args=(self.user, self.finger_label, nextBtn)).start()
-            nextBtn.configure(command= lambda: self.registDone())
+            Thread(target=self.fingerprint_thread, args=(nextBtn,True,),daemon=True).start()
         else:
-            Thread(target=fingerprint.fingerprint_login, args=(self.user, self.finger_label, nextBtn)).start()
-            nextBtn.configure(command= lambda: self.userPage())
-
-
-
+            Thread(target=self.fingerprint_thread, args=(nextBtn,False,),daemon=True).start()
+                            
         #! TESTS ONLY
-        nextBtntest = Ctk.CTkButton(self.frame , text="TEST NEXT", command= lambda: self.userPage())
-        nextBtntest.place(x=610,  y=510)
+        # nextBtntest = Ctk.CTkButton(self.frame , text="TEST NEXT", command= lambda: self.userPage())
+        # nextBtntest.place(x=610,  y=510)
+    
+    def fingerprint_thread(self, nextbtn, register):
+        """
+        Performs fingerprint registration or login
+
+        Args:
+            nextbtn (Ctk.CTkButton): Next button
+            register (bool): If true, register a new user. Defaults to False.
+        Returns:
+            None
+        """
+        user=self.user
+        success = False
+        while not success:
+            try:
+                if register:
+                    success = fingerprint.fingerprint_register(user, self.finger_label, nextbtn)
+                else:
+                    success = fingerprint.fingerprint_login(user, self.finger_label, nextbtn)
+            #runtime error
+            except RuntimeError:
+                self.PopUp("Fingerprint sensor disconnected")
+                success = False
+        
+        if register:
+            nextbtn.configure(command= lambda: self.registDone())
+        else:
+            nextbtn.configure(command= lambda: self.userPage())
         
         
     def registDone(self):
@@ -296,14 +349,14 @@ class App(Ctk.CTk):
             widget.destroy()
 
         label = Ctk.CTkLabel(self.frame, text="Successfully registered!", text_color="green",font=("Arial", 20))
-        label.place(x=450, y=40)
+        label.place(x=550, y=40, anchor="center")
 
         userImg = Ctk.CTkImage(light_image=Image.open("./img/register.png"), size=(256 , 256))
         user_label = Ctk.CTkLabel(master=self.frame, image=userImg, text='')
-        user_label.place(x=422, y=162)
+        user_label.place(x=550, y=290, anchor="center")
 
         doneBtn = Ctk.CTkButton(self.frame , text="Done", command= lambda: self.nfc() )
-        doneBtn.place(x=480, y=540)
+        doneBtn.place(x=550, y=540, anchor="center")
 
     def userPage(self):
         """
@@ -313,14 +366,14 @@ class App(Ctk.CTk):
             widget.destroy()
 
         label = Ctk.CTkLabel(self.frame, text="Authentication Successful!", text_color="green",font=("Arial", 20))
-        label.place(x=450, y=40)
+        label.place(x=550, y=40, anchor="center")
 
         userImg = Ctk.CTkImage(light_image=Image.open("./img/profile.png"), size=(256 , 256))
         user_label = Ctk.CTkLabel(master=self.frame, image=userImg, text='')
-        user_label.place(x=422, y=162)
+        user_label.place(x=550, y=290, anchor="center")
 
         doneBtn = Ctk.CTkButton(self.frame , text="Done", command= lambda: self.nfc() )
-        doneBtn.place(x=480, y=540)
+        doneBtn.place(x=550, y=540, anchor="center")
         self.open_camera()
 
 
@@ -380,38 +433,10 @@ if __name__ == "__main__":
     #change exposure
     #show camera feed
     gamma = 1.0
-    # while True:
-    #     ret, frame = vid.read()
-    #     frame = cv2.flip(frame, 1)
-        
-    #            #adjust  gamma
-    #     invGamma = 1.0 / gamma
-    #     table = np.array([((i / 255.0) ** invGamma) * 255
-    #         for i in np.arange(0, 256)]).astype("uint8")
-    #     frame = cv2.LUT(frame, table)
-    #     # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    #     # frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-    #     cv2.imshow("frame", frame)
-    #     key = cv2.waitKey(1)
-    #     if key & 0xFF == ord('q'):
-    #         break
-    #     elif key == ord('d'):
-    #         gamma += 0.1
-    #         print(gamma)
-    #     elif key == ord('a'):
-    #         gamma -= 0.1
-    #         print(gamma)
-        
+    logging.basicConfig(level=logging.INFO)        
     cv2.destroyAllWindows()
     
     
     app = App(vid)
-
-    pid = os.getpid()
-    #if windows
-    if os.name == "nt":
-        app.protocol("WM_DELETE_WINDOW", lambda: os.system(f"taskkill /pid {pid} /f"))
-    else:
-        app.protocol("WM_DELETE_WINDOW", lambda: os.system(f"kill {pid}"))
 
     app.mainloop()
