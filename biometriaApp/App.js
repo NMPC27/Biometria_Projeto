@@ -29,6 +29,7 @@ function App() {
   }
 
   return (
+    <>
     <View style={styles.wrapper}>
       <Button
         onPress={readNdef}
@@ -37,6 +38,8 @@ function App() {
 
       <Text>{print}</Text>
     </View>
+    <View style={{flex: 2 }} /> 
+    </>
   );
 }
 
