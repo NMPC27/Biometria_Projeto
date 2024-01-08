@@ -32,7 +32,6 @@ def capture_frame(vid, raw=False):
 
 def eye_aspect_ratio(eye):
 
-
     # calculate the vertical distances 
     y1 = dist.euclidean(eye[1], eye[5]) 
     y2 = dist.euclidean(eye[2], eye[4]) 

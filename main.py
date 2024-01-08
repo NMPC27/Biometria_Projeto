@@ -230,7 +230,6 @@ class App(Ctk.CTk):
                 blinks += 1
                 last_blink = time.time()
             
-            
             #!DEBUG / RELATORIO #####################
             # self.video_label.after_cancel(self.cancel_handle)
             # #draw blinks

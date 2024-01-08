@@ -4,8 +4,8 @@ This repository is for the Bimetircs course.
 
 ## Authors
 - Bernardo Kaluza
-- Alexandre Gago
 - Nuno Cunha
+- Alexandre Gago
 
 ## Requirements
 - Python 3.8 or higher
