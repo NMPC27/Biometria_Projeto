@@ -1,24 +1,28 @@
 # Biometria_Projeto
 This repository is for the Bimetircs course.
 
-TODO:
-- melhorar deteçao
-- tirar + fts da face em diferentes condiçoes para melhorar a deteçao do deepface
-- por codigo binoto
-  
-No regist deviamos obrigar a pessoa a tirar uma boa ft
-- boa iluminaçao
 
-Testes: tirar 3 fts e ver se passa
-- boa
-- baixa iluminaçao
-- longe
-- - pessoaas de vairas etnias chines africa
+## Authors
+- Bernardo Kaluza
+- Alexandre Gago
+- Nuno Cunha
 
-Performance issues se mudar isto
-  Ctk.set_appearance_mode("Dark")   -> system laga bue
-  Ctk.set_default_color_theme("blue")  -> dark-blue laga um pouco
+## Requirements
+- Python 3.8 or higher
+- Adafruit fingerprint sensor, or any other compatible with the Adafruit library
+- UART to USB converter, such as the one provided by the MakerLab
 
-  o porque n sei
+## How to run
+
+### 1. Install the requirements
+```
+pip install -r requirements.txt
+```
+
+### 2. Run the main.py file
+```
+python3 main.py
+```
+
 
 
