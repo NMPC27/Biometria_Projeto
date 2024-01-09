@@ -91,7 +91,7 @@ def faceVerify(image,user):
 
 
 
-    result = DeepFace.verify(img1_path = image, img2_path = f"./db/{user}/user.png", model_name = 'Facenet')
+    result = DeepFace.verify(img1_path = image, img2_path = f"./db/{user}/user.png", model_name = 'ArcFace')
     print(f"result: {result['verified']}")
 
     if result["verified"]:
