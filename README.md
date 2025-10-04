@@ -37,9 +37,16 @@ If a new user is detected, the system automatically registers their credentials 
 
 ![screenshot](docs_img/setup1.png)
 
+NFC reader (smartphone) and Fingerprint reader
+
 ![screenshot](docs_img/setup2.png)
 
+Fingerprint reader setup
+
 ![screenshot](docs_img/setup3.png)
+
+Final setup with NFC reader, Fingerprint reader and PC camera
+
 
 ## Requirements
 
